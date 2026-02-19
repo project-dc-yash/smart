@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSPM Smart Bin IoT</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #38bdf8;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --whatsapp: #25D366;
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+
+        /* Animated Bin */
+        .bin-container {
+            width: 100px;
+            height: 150px;
+            border: 4px solid #64748b;
+            border-radius: 0 0 15px 15px;
+            margin: 20px auto;
+            position: relative;
+            overflow: hidden;
+            background: #334155;
+        }
+
+        .bin-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: var(--primary);
+            transition: height 0.5s ease-in-out;
+            height: 0%;
+        }
+
+        .fill-danger { background: var(--danger) !important; animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; }
+        }
+
+        /* Notifications */
+        .notification {
+            display: none;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            border: 2px solid;
+        }
+        .n-red { background: rgba(239, 68, 68, 0.2); border-color: var(--danger); color: #ff8a8a; }
+        .n-green { background: rgba(34, 197, 94, 0.2); border-color: var(--success); color: #afffaf; }
+
+        .btn {
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-wa { background: var(--whatsapp); color: white; display: none; }
+        .btn-restart { background: var(--primary); color: var(--bg-color); margin-top: 20px; }
+        .btn:hover { transform: scale(1.05); opacity: 0.9; }
+
+        #timerBox { font-size: 0.9rem; color: #94a3b8; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Smart Bin <span style="color: var(--primary);">IoT System</span></h1>
+    <p style="color: #64748b;">JSPM Jayawantrao Sawant College of Engineering</p>
+
+    <div class="container">
+        <div class="card">
+            <h3>Bin Level Monitor</h3>
+            <div id="timerBox">Time to Full: <span id="seconds">30</span>s</div>
+            <div class="bin-container">
+                <div id="binFill" class="bin-fill"></div>
+            </div>
+            <h2 id="levelText">0%</h2>
+            <div id="statusLabel" style="color: var(--success); font-weight: bold;">SYSTEM READY</div>
+            
+            <button class="btn btn-restart" onclick="restartProject()">RESET & START NEW PROJECT</button>
+        </div>
+
+        <div class="card">
+            <h3>Status Notifications</h3>
+            
+            <div id="msgNormal" class="notification n-green" style="display: block;">
+                ✅ BIN STATUS: EMPTY / NORMAL
+            </div>
+
+            <div id="msgFull" class="notification n-red">
+                🚨 ATTENTION: 100% FULL! 🚨<br>
+                Please Empty the Bin
+            </div>
+
+            <div id="msgWA" class="notification n-green" style="font-size: 0.8rem;">
+                💬 WhatsApp Alert Dispatched to Supervisor
+            </div>
+            
+            <a href="#" id="waBtn" class="btn btn-wa" target="_blank">OPEN WHATSAPP LINK</a>
+        </div>
+    </div>
+
+    <script>
+        let timeLeft = 30;
+        let mainLoop;
+        const presetLat = "18.463923039571025";
+        const presetLon = "73.8683477705353";
+
+        function updateDisplay(level) {
+            const fill = document.getElementById('binFill');
+            const text = document.getElementById('levelText');
+            const label = document.getElementById('statusLabel');
+
+            fill.style.height = level + '%';
+            text.innerText = level + '%';
+
+            if (level >= 100) {
+                fill.classList.add('fill-danger');
+                label.innerText = "CRITICAL: OVERFLOW";
+                label.style.color = "var(--danger)";
+                
+                document.getElementById('msgNormal').style.display = 'none';
+                document.getElementById('msgFull').style.display = 'block';
+                
+                triggerAlerts();
+            } else {
+                fill.classList.remove('fill-danger');
+                label.innerText = "MONITORING...";
+                label.style.color = "var(--primary)";
+                document.getElementById('msgNormal').style.display = 'block';
+                document.getElementById('msgFull').style.display = 'none';
+            }
+        }
+
+        function triggerAlerts() {
+            const message = `🚨 *SMART BIN 100% FULL* 🚨\n\nLocation: JSPM JSCOE\nLat: ${presetLat}\nLon: ${presetLon}\n\nPlease clear the bin to reset the system.`;
+            const whatsappUrl = `https://wa.me/919403881406?text=${encodeURIComponent(message)}`;
+
+            document.getElementById('msgWA').style.display = 'block';
+            const btn = document.getElementById('waBtn');
+            btn.href = whatsappUrl;
+            btn.style.display = 'inline-block';
+        }
+
+        function startProjectTimer() {
+            // Reset variables
+            timeLeft = 30;
+            document.getElementById('seconds').innerText = timeLeft;
+            
+            mainLoop = setInterval(() => {
+                if (timeLeft > 0) {
+                    timeLeft--;
+                    document.getElementById('seconds').innerText = timeLeft;
+                    
+                    // Random movement 10-90%
+                    let randomLevel = Math.floor(Math.random() * 81) + 10;
+                    updateDisplay(randomLevel);
+                } else {
+                    clearInterval(mainLoop);
+                    updateDisplay(100);
+                }
+            }, 1000);
+        }
+
+        function restartProject() {
+            // Stop current timer
+            clearInterval(mainLoop);
+            
+            // Reset UI
+            updateDisplay(0);
+            document.getElementById('msgWA').style.display = 'none';
+            document.getElementById('waBtn').style.display = 'none';
+            document.getElementById('msgFull').style.display = 'none';
+            document.getElementById('msgNormal').style.display = 'block';
+            
+            // Start again
+            startProjectTimer();
+        }
+
+        // Auto-start on load
+        window.onload = startProjectTimer;
+    </script>
+</body>
+</html>
